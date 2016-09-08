@@ -34,7 +34,7 @@ A player’s program only received standard input stdin, so you can use scanf or
 
 ## Public information:
 --the third line has two numbers: the total number of players and the total number of cards;
-—-there are still 5*current_round+4 lines in NORMAL mode, and 5*(current_round-1) lines in SMALL mode. That is, when deciding which lines to replace, it already enters the next round.
+—-there are still 5×current_round+4 lines in NORMAL mode, and 5×(current_round-1) lines in SMALL mode. That is, when deciding which lines to replace, it already enters the next round.
 
 --the next 4 lines are the cards on table initially, every line has 5 numbers, with 0s filled for empty slots.
 
