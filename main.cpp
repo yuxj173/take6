@@ -16,6 +16,7 @@ int num_games = -1;
 char *logfile_p, logfile[1010];
 int random_seed;
 int start_from = 1;
+int show_scores;
 
 void argparse(int argc, char **argv);
 
@@ -110,7 +111,7 @@ public:
 		this->game_cnt ++;
 		this->random_shuffle(cards + 1, cards + NUM_CARDS + 1);
 	}
-	vector <int> run(int game_id, int game_rd, vector <Agent*> agents, bool debug = false) {
+	vector <int> run(int game_id, int game_rd, vector <Agent*> agents, vector <int> score, bool debug = false) {
 		this->init_new_game();
 		
 		int *p = cards + 1;
@@ -161,7 +162,14 @@ public:
 						printf(" ");
 					printf("%d", env->score[i]);
 				}
-				printf("]\033[0m \n");
+				printf("]\033[0m");
+				printf("\033[1;35m (last [");
+				for (int i = 0; i < num_players; ++i) {
+					if (i > 0)
+						printf(" ");
+					printf("%d", score[i]);
+				}
+				printf("])\033[0m \n");
 				}
 				printf("============ %d-%d (%d) ROUND %d END ============== \n\n", game_id, game_rd, game_cnt, i);
 				char c;
@@ -187,16 +195,17 @@ public:
 		}
 		for (int i = 0; i < num_players; ++i)
 			agents[i]->callback(i, NUM_ROUNDS, env->show_handcards(i), num_players, NUM_CARDS, playeds, env->score);
-		return env->score;
+		return sum_score(env->score, score);
 	}
-	vector <int> run66(int game_id, vector <Agent*> agents, bool debug = false) {
+	vector <int> run66(int game_id, vector <Agent*> agents, bool debug = false, bool show_scores = false) {
 		vector <int> score;
 		score.resize(agents.size());
 		int cnt = 0;
 		while (*max_element(score.begin(), score.end()) < 66) {
-			score = sum_score(score, run(game_id, cnt, agents, debug));
+			score = run(game_id, cnt, agents, score, debug);
 			++cnt;
-			//printf("[%2d %2d]->", score[0], score[1]);
+			if (show_scores) 
+				fprintf(stderr, "--- %2d [%2d %2d] \n", cnt, score[0], score[1]);
 		}
 		return score;
 	}
@@ -235,14 +244,18 @@ int main(int argc, char **argv) {
 	double pt1 = 0;
 	while (game_id != num_games) {
 		game_id++;
-		vector <int> score = table->run66(game_id, agents, debug);
-		
+		int start = table->game_cnt, end;
+		vector <int> score = table->run66(game_id, agents, debug, show_scores);
 		pt1 += table->getpt(score);
-		fprintf(stderr, "this game [%2d %2d], total [%.1lf %.1lf]\n", score[0], score[1], pt1, game_id - pt1);
+		end = table->game_cnt;
+		fprintf(stderr, "results : [%2d %2d], total [%.1lf %.1lf] \033[1;30m (details : %d rounds, game-cnt from %d to %d) \033[0m\n", score[0], score[1], pt1, game_id - pt1, end - start, start, end);
 	}
 }
 void argparse(int argc, char **argv) {
 	for (int i = 1; i < argc; ++i) {
+		if (strcmp(argv[i], "-ss") == 0 or strcmp(argv[i], "--show_scores") == 0) {
+			show_scores = 1;
+		}
 		if (strcmp(argv[i], "-d") == 0 or strcmp(argv[i], "--debug") == 0)
 			debug = 1;
 		if (strcmp(argv[i], "-n") == 0 or strcmp(argv[i], "--number") == 0) {
@@ -255,9 +268,10 @@ void argparse(int argc, char **argv) {
 			sscanf(argv[++i], "%d", &start_from);
 		}
 		if (strcmp(argv[i], "-h") == 0 or strcmp(argv[i], "--help") == 0) {
-			fprintf(stderr, "usage: ./prog_name [-h] [-d] [-s NUM] [-n NUM] [-r NUM]\n\n");
+			fprintf(stderr, "usage: ./prog_name [-h] [-ss] [-d] [-s NUM] [-n NUM] [-r NUM]\n\n");
 			fprintf(stderr, "optional arguments\n");
 			fprintf(stderr, "-h, --help            show this help message and exit\n");
+			fprintf(stderr, "-ss, --show_scores    show the scores after one game ends\n");
 			fprintf(stderr, "-d, --debug           debug mode, will print the situation everytime after all agents decided their cards to show\n");
 			fprintf(stderr, "-s, --start_from NUM  generate the game from game_cnt <start_from>\n");
 			fprintf(stderr, "-n NUM, --num NUM     set the maximum number of games to run, default is -1, denoting unending games\n");

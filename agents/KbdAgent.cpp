@@ -2,8 +2,6 @@
 	agent : KbdAgent (Human Player)
 	use it to play take6!
 */
-	
-*/
 
 #include "agent.h"
 #include <cmath>
