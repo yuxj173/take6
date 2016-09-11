@@ -96,7 +96,7 @@ private:
 	int gen_segs_to(int *card, double *prob, Env *env) {
 		stor_min_id_nimmts = env->min_id();
 		int cnt = 0, num = 0;
-		double mini = 1e10;
+		double maxi = 0, tot = 0;
 		bar[0] = 0;
 		for (int i = 0; i < num_handcards; ++i)
 			bar[++num] = handcards[i];
@@ -116,11 +116,9 @@ private:
 				continue;
 			card[cnt] = mdc;
 			prob[cnt] = (double) (pre_sum[bar[i + 1] - 1] - pre_sum[bar[i]]) / tot_cards;
-			mini = min(mini, prob[cnt]);
 			++cnt;
 		}
 		
-		double tot = 0;
 		return cnt;
 	}
 	double search(int depth, Env *env) {
@@ -242,6 +240,8 @@ public:
 		return env->min_id();
 	}
 };
+
+AgentsRegister XAgentRegister("x", new XAgent_v001());
 /*
 int main(int argc, char **argv) {
 	NaiveAgent1v1 *agent = new NaiveAgent1v1();

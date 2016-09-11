@@ -7,6 +7,7 @@
 #include <cstring>
 #include <iostream>
 #include <typeinfo>
+#include <unistd.h>
 #include <algorithm>
 using namespace std;
 
@@ -17,8 +18,9 @@ char *logfile_p, logfile[1010];
 int random_seed;
 int start_from = 1;
 int show_scores;
+int show_scores_gap_time = 1;
 
-void argparse(int argc, char **argv);
+void argparse(int argc, char **argv, vector <Agent*> &agents);
 
 class Table {
 private:
@@ -111,7 +113,7 @@ public:
 		this->game_cnt ++;
 		this->random_shuffle(cards + 1, cards + NUM_CARDS + 1);
 	}
-	vector <int> run(int game_id, int game_rd, vector <Agent*> agents, vector <int> score, bool debug = false) {
+	vector <int> run(int game_id, int game_rd, vector <Agent*> agents, vector <int> score, bool debug = false, bool show_scores = false) {
 		this->init_new_game();
 		
 		int *p = cards + 1;
@@ -195,23 +197,29 @@ public:
 		}
 		for (int i = 0; i < num_players; ++i)
 			agents[i]->callback(i, NUM_ROUNDS, env->show_handcards(i), num_players, NUM_CARDS, playeds, env->score);
-		return sum_score(env->score, score);
+		
+		score = sum_score(env->score, score);
+		if (show_scores) {
+			fprintf(stderr, "---%2d [%2d %2d] \033[1;30m+ (%2d %2d) \033[0m\n", game_rd, score[0], score[1], env->score[0], env->score[1]);
+			sleep(show_scores_gap_time);
+		}
+		
+		return score;
+		
 	}
 	vector <int> run66(int game_id, vector <Agent*> agents, bool debug = false, bool show_scores = false) {
 		vector <int> score;
 		score.resize(agents.size());
 		int cnt = 0;
 		while (*max_element(score.begin(), score.end()) < 66) {
-			score = run(game_id, cnt, agents, score, debug);
+			score = run(game_id, cnt, agents, score, debug, show_scores);
 			++cnt;
-			if (show_scores) 
-				fprintf(stderr, "--- %2d [%2d %2d] \n", cnt, score[0], score[1]);
 		}
 		return score;
 	}
 	double getpt(vector <int> score) {
 		if (score[0] >= 66)
-			return score[1] >= 66 ? 1 : 0;
+			return score[1] >= 66 ? 0.5 : 0;
 		return 1;
 	}
 };
@@ -219,19 +227,17 @@ public:
 int main(int argc, char **argv) {
 	char *logfile, logf[1010];
 
-	argparse(argc, argv);
-	srand(random_seed);
-	
-	Table *table = new Table(random_seed);
 	vector <Agent*> agents;
 	
-	Agent *easiest_v2 = new EasiestAgent_v2();
-	Agent *easiest = new EasiestAgent();
-	Agent *x = new XAgent_v001();
-	Agent *kbd = new KbdAgent();
+	argparse(argc, argv, agents);
+	srand(random_seed);
 	
-	agents.push_back(easiest_v2);
-	agents.push_back(x);
+	if (agents.size() != 2) {
+		printf("the number of agents is not equal to 2.");
+		exit(0);
+	}
+	
+	Table *table = new Table(random_seed);
 	
 	for (int i = 0; i < agents.size(); ++i) {
 		printf("agents %d : %s \n", i, typeid(*agents[i]).name());
@@ -248,35 +254,52 @@ int main(int argc, char **argv) {
 		vector <int> score = table->run66(game_id, agents, debug, show_scores);
 		pt1 += table->getpt(score);
 		end = table->game_cnt;
-		fprintf(stderr, "results : [%2d %2d], total [%.1lf %.1lf] \033[1;30m (details : %d rounds, game-cnt from %d to %d) \033[0m\n", score[0], score[1], pt1, game_id - pt1, end - start, start, end);
+		fprintf(stderr, "results : [%2d %2d], total [%.1lf %.1lf] \033[1;30m (details : %d rounds, game-cnt from %d to %d) \033[0m\n", score[0], score[1], pt1, game_id - pt1, end - start, start + 1, end);
 	}
 }
-void argparse(int argc, char **argv) {
+void argparse(int argc, char **argv, vector <Agent*> &agents) {
 	for (int i = 1; i < argc; ++i) {
 		if (strcmp(argv[i], "-ss") == 0 or strcmp(argv[i], "--show_scores") == 0) {
 			show_scores = 1;
 		}
-		if (strcmp(argv[i], "-d") == 0 or strcmp(argv[i], "--debug") == 0)
+		else if (strcmp(argv[i], "-d") == 0 or strcmp(argv[i], "--debug") == 0)
 			debug = 1;
-		if (strcmp(argv[i], "-n") == 0 or strcmp(argv[i], "--number") == 0) {
+		else if (strcmp(argv[i], "-n") == 0 or strcmp(argv[i], "--number") == 0) {
 			sscanf(argv[++i], "%d", &num_games);
 		}
-		if (strcmp(argv[i], "-r") == 0 or strcmp(argv[i], "--random") == 0) {
+		else if (strcmp(argv[i], "-r") == 0 or strcmp(argv[i], "--random") == 0) {
 			sscanf(argv[++i], "%d", &random_seed);
 		}
-		if (strcmp(argv[i], "-s") == 0 or strcmp(argv[i], "--start_from") == 0) {
+		else if (strcmp(argv[i], "-s") == 0 or strcmp(argv[i], "--start_from") == 0) {
 			sscanf(argv[++i], "%d", &start_from);
 		}
-		if (strcmp(argv[i], "-h") == 0 or strcmp(argv[i], "--help") == 0) {
-			fprintf(stderr, "usage: ./prog_name [-h] [-ss] [-d] [-s NUM] [-n NUM] [-r NUM]\n\n");
+		else if (strcmp(argv[i], "-h") == 0 or strcmp(argv[i], "--help") == 0) {
+			fprintf(stderr, "usage: ./prog_name [-h] [-l] [-ss] [-d] [-s NUM] [-n NUM] [-r NUM] <agent1> <agent2> ... \n\n");
 			fprintf(stderr, "optional arguments\n");
 			fprintf(stderr, "-h, --help            show this help message and exit\n");
+			fprintf(stderr, "-l, --list            show agents_set\n");
 			fprintf(stderr, "-ss, --show_scores    show the scores after one game ends\n");
 			fprintf(stderr, "-d, --debug           debug mode, will print the situation everytime after all agents decided their cards to show\n");
 			fprintf(stderr, "-s, --start_from NUM  generate the game from game_cnt <start_from>\n");
 			fprintf(stderr, "-n NUM, --num NUM     set the maximum number of games to run, default is -1, denoting unending games\n");
 			fprintf(stderr, "-r NUM, --random NUM  set the random_seed, default is 0.\n");
 			exit(0);
+		}
+		else if (strcmp(argv[i], "-l") == 0 or strcmp(argv[i], "--list") == 0) {
+			map <string, Agent*> :: iterator x = agents_set.begin();
+			while (x != agents_set.end())
+				printf("agent [%s] : %s \n", x->first.c_str(), typeid(*x->second).name()), ++x;
+			exit(0);
+		}
+		else {
+			if (agents_set.find(argv[i]) == agents_set.end()) {
+				printf("agent [%s] not found. \n== see the agents list: \n", argv[i]);
+				map <string, Agent*> :: iterator x = agents_set.begin();
+				while (x != agents_set.end())
+					printf("agent [%s] : %s \n", x->first.c_str(), typeid(*x->second).name()), ++x;
+				exit(0);
+			}
+			else agents.push_back(agents_set[argv[i]]);
 		}
 	}
 }

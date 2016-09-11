@@ -221,3 +221,5 @@ public:
 		return env->min_id();
 	}
 };
+
+AgentsRegister EasiestAgentRegister("eaiest", new EasiestAgent());

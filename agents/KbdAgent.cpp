@@ -144,6 +144,9 @@ public:
 		scanf("%c", &_);
 	}
 };
+
+AgentsRegister KbdAgentRegister("kbd", new KbdAgent());
+
 /*
 int main(int argc, char **argv) {
 	NaiveAgent1v1 *agent = new NaiveAgent1v1();
