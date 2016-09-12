@@ -2,3 +2,4 @@
 #include "XAgent.cpp"
 #include "KbdAgent.cpp"
 #include "Easiest.cpp"
+#include "ZAgent.cpp"

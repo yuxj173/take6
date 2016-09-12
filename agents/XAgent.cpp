@@ -105,15 +105,21 @@ private:
 		bar[++num] = NUM_CARDS + 1;
 		sort(bar, bar + num + 1);
 		for (int i = 0; i < num; ++i) {
-			int mdc = -1;
+			int mdc = -1, cnt2 = 0, cnt3 = 0;
 			for (int j = bar[i] + 1; j < bar[i + 1]; ++j) {
-				if (shows[j] == false) {
-					mdc = j;
-					break;
-				}
+				if (shows[j] == false)
+					++cnt2;
 			}
-			if (mdc == -1)
+			if (cnt2 == 0)
 				continue;
+			cnt2 = (cnt2 + 1) / 2;
+			for (int j = bar[i] + 1; j < bar[i + 1]; ++j) {
+				if (shows[j] == false)
+					if (++cnt3 == cnt2) {
+						mdc = j;
+						break;
+					}
+			}
 			card[cnt] = mdc;
 			prob[cnt] = (double) (pre_sum[bar[i + 1] - 1] - pre_sum[bar[i]]) / tot_cards;
 			++cnt;
@@ -218,17 +224,12 @@ public:
 			tot_cards += shows[i] == 0;
 		}
 		
-		maxdepth = 2;
-
+		maxdepth = num_handcards;
+		if (num_handcards >= 5)
+			maxdepth = 3;
+		if (num_handcards >= 7)
+			maxdepth = 2;
 		//-------------------------------------
-		
-		if (0) {
-			printf("NaiveAgent1v1 handcards : ");
-			for (int i = 0; i < num_handcards; ++i) {
-				printf("%d ", handcards[i]);
-			}
-			printf("\n");
-		}
 	}
 	int policy(int pid, int rd, vector <int> handcards, int num_players, int num_cards, vector <int> cards, vector <int> scores) {
 		Init(pid, rd, handcards, num_players, num_cards,cards, 0);
