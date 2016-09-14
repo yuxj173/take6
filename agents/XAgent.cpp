@@ -29,9 +29,14 @@ private:
 	int bar[20];
 	bool shows[110];
 	int _;
+	double log_c[110][110], log_fac[110];
 	int maxdepth;
 	int stor_segs_card[10][110];
 	double stor_segs_prob[10][110];
+	double prob_single[20][110];
+	double prob_all[20][110];
+	double prob_double[20][110];
+	int ppp[20];
 	struct Env {
 		int *stacks[NUM_STACKS], nimmts[NUM_STACKS], scores[NUM_PLAYERS];
 
@@ -48,10 +53,16 @@ private:
 			}
 			return sid;
 		}
-		inline int push(const int &card, const int &pid, int *stor) {
+		inline void sort() {
+			for (int i = 0; i < NUM_STACKS; ++i)
+				for (int j = 1; j < NUM_STACKS - i; ++j)
+					if (stacks[j - 1][stacks[j - 1][0]] > stacks[j][stacks[j][0]])
+						swap(stacks[j], stacks[j - 1]), swap(nimmts[j], nimmts[j - 1]);
+		}
+		inline int push(const int &card, const int &pid, int *stor, int select = -1) {
 			int sid = to(card), punish = 0;
 			if (sid == -1)
-				sid = min_id();
+				sid = select == -1 ? min_id() : select;
 			int *s = stacks[sid];
 			if (s[s[0]] > card  ||  s[0] == STACK_DEPTH) {
 				stor[0] = 1, stor[1] = card;
@@ -68,6 +79,54 @@ private:
 			stacks[sid] = stor;
 			scores[pid] += punish;
 		}
+		inline void push2(const int &card1, const int &card2, int *stor) {
+			int s1 = to(card1), s2 = to(card2);
+			if (s1 == -1  &&  s2 != -1) {
+				int x = min_id();
+				if (x == s2  &&  (s2 == 0  ||  stacks[s2 - 1][0] != 5)  &&  stacks[s2][0] == 5) {
+					int idx = x;
+					for (int i = 0; i < NUM_STACKS; ++i)
+						if (i != s2  &&  (idx == s2  || nimmts[i] < nimmts[idx]))
+							idx = i;
+					if (nimmts[idx] - nimmts[x] < nimmts[x])
+						x = idx;
+				}
+				else if (x != s2  &&  (s2 != 0  &&  	stacks[s2 - 1][0] == 5)) {
+					if (stacks[s2][0] != 5) {
+						if (nimmts[x] > nimmts[s2] - nimmts[s2 - 1]) x = s2;
+					}
+					else {
+						if (nimmts[x] - nimmts[s2] > nimmts[s2] - nimmts[s2 - 1]) x = s2;
+					}
+				}
+				push(card1, 0, stor, x);
+				push(card2, 1, stor + (STACK_DEPTH + 1));
+			}
+			else if (s2 == -1  &&  s1 != -1) {
+				int x = min_id();
+				if (x == s1  &&  (s1 == 0  ||  stacks[s1 - 1][0] != 5)  &&  stacks[s1][0] == 5) {
+					int idx = x;
+					for (int i = 0; i < NUM_STACKS; ++i)
+						if (i != s1  &&  (idx == s1  || nimmts[i] < nimmts[idx]))
+							idx = i;
+					if (nimmts[idx] - nimmts[x] < nimmts[x])
+						x = idx;
+				}
+				else if (x != s1  &&  (s1 != 0  &&  stacks[s1 - 1][0] == 5)) {
+					if (stacks[s1][0] != 5) {
+						if (nimmts[x] > nimmts[s1] - nimmts[s1 - 1]) x = s1;
+					}
+					else {
+						if (nimmts[x] - nimmts[s1] > nimmts[s1] - nimmts[s1 - 1]) x = s1;
+					}
+				}
+				push(card2, 1, stor, x);
+				push(card1, 0, stor + (STACK_DEPTH + 1));
+			}
+			else if (card1 < card2)
+				push(card1, 0, stor), push(card2, 1, stor + (STACK_DEPTH + 1));
+			else push(card2, 1, stor), push(card1, 0, stor + (STACK_DEPTH + 1));
+		}
 	};
 	Env *env, stor_env[10];
 
@@ -80,17 +139,17 @@ private:
 			int *s = env->stacks[sid];
 			if (s[0] == STACK_DEPTH)
 				e = (1.0 - (double) (pre_sum[card - 1] - pre_sum[s[s[0]]]) / tot_cards) * env->nimmts[sid];
-      else {
-        e = (-0.1 + pre_sum[card - 1] - pre_sum[s[s[0]]]) / tot_cards / (STACK_DEPTH - s[0]) * env->nimmts[sid];
-		for (int i = 0; i < NUM_STACKS; ++i)
-			if (env->stacks[i][env->stacks[i][0]] > card)
-				next_card = min(next_card, env->stacks[i][env->stacks[i][0]]);
-        if (s[0] == 4)
-          e -= (double) (pre_sum[next_card - 1] - pre_sum[card]) / tot_cards * (env->nimmts[sid] + NIMMTS[card]);
-        else
-          e += (double) (pre_sum[next_card - 1] - pre_sum[card]) / tot_cards * (env->nimmts[sid] + NIMMTS[card]);
-      }
-    }
+			else {
+				e = (-0.1 + pre_sum[card - 1] - pre_sum[s[s[0]]]) / tot_cards / (STACK_DEPTH - s[0]) * env->nimmts[sid];
+				for (int i = 0; i < NUM_STACKS; ++i)
+					if (env->stacks[i][env->stacks[i][0]] > card)
+						next_card = min(next_card, env->stacks[i][env->stacks[i][0]]);
+				if (s[0] == 4)
+					e -= (double) (pre_sum[next_card - 1] - pre_sum[card]) / tot_cards * (env->nimmts[sid] + NIMMTS[card]);
+				else
+					e += (double) (pre_sum[next_card - 1] - pre_sum[card]) / tot_cards * (env->nimmts[sid] + NIMMTS[card]);
+			}
+		}
 		return e;
 	}
 	int gen_segs_to(int *card, double *prob, Env *env) {
@@ -150,7 +209,9 @@ private:
 			for (int j = 0; j < num_segs; ++j) {
 				r_card = segs_card[j], prob = segs_prob[j];
 				*temp = *env;
-				if (r_card < card) {
+				temp->push2(card, r_card, stor);
+				stor += (STACK_DEPTH + 1) * 2;
+				/*if (r_card < card) {
 					temp->push(r_card, 1, stor);
 					stor += STACK_DEPTH + 1;
 					temp->push(card, 0, stor);
@@ -161,13 +222,13 @@ private:
 					stor += STACK_DEPTH + 1;
 					temp->push(r_card, 1, stor);
 					stor += STACK_DEPTH + 1;
-				}
+				}*/
+				//temp->push(card, stor)
 
 				shows[r_card] = 1, shows[card] = 1;
 				e += search(depth + 1, temp) * prob;
 				shows[r_card] = 0, shows[card] = 0;
-				stor -= STACK_DEPTH + 1;
-				stor -= STACK_DEPTH + 1;
+				stor -= (STACK_DEPTH + 1) * 2;
 			}
 			num_handcards++;
 			for (int j = num_handcards - 1; j > i; --j)
@@ -185,6 +246,22 @@ public:
 		for (int i = 0; i < NUM_STACKS; ++i) {
 			env->stacks[i] = stor;
 			stor += STACK_DEPTH + 1;
+		}
+		
+		log_fac[0] = 0;
+		for (int i = 1; i <= NUM_CARDS; ++i) {
+			log_fac[i] = log_fac[i - 1] + log(i);
+		}
+		for (int i = 0; i <= NUM_CARDS; ++i) {
+			for (int j = 0; j <= NUM_CARDS; ++j)
+				log_c[i][j] = log_fac[i] - log_fac[i - j] - log_fac[j];
+		}
+		for (int i = 1; i <= NUM_ROUNDS; ++i) {
+			for (int j = 0; j <= NUM_CARDS; ++j) {
+				int rest = NUM_CARDS - NUM_STACKS - (NUM_ROUNDS - i) * NUM_PLAYERS - i;
+				prob_all[i][j] = j < i ? 0 : min(1., exp(log_c[j][i] - log_c[rest][i]));
+				prob_single[i][j] = rest - j < i ? 1 : 1 - exp(log_c[rest - j][i] - log_c[rest][i]);
+			}
 		}
 	}
 	void Init(int pid, int rd, vector <int> __handcards, int num_players, int num_cards, vector <int> __cards, bool small_mode) {
@@ -213,7 +290,7 @@ public:
 			}
 			if ((i != rd) || (small_mode == 1)) {
 				for (int j = 0; j < num_players; ++j) {
-					card = __cards[cid++];
+					ppp[j] = card = __cards[cid++];
 					shows[card] = 1;
 				}
 			}
@@ -229,6 +306,8 @@ public:
 			maxdepth = 3;
 		if (num_handcards >= 7)
 			maxdepth = 2;
+		
+		maxdepth = 1;
 		//-------------------------------------
 	}
 	int policy(int pid, int rd, vector <int> handcards, int num_players, int num_cards, vector <int> cards, vector <int> scores) {
@@ -238,7 +317,20 @@ public:
 	}
 	int policy_min(int pid, int rd, vector <int> handcards, int num_players, int num_cards, vector <int> cards, vector <int> scores) {
 		Init(pid, rd, handcards, num_players, num_cards, cards, 1);
-		return env->min_id();
+		Env *temp = stor_env;
+		double max_e = -1e10;
+		int sel = -1;
+		for (int i = 0; i < NUM_STACKS; ++i) {
+			*temp = *env;
+			temp->push(ppp[pid], 0, stor, i), stor += (STACK_DEPTH + 1);
+			temp->push(ppp[1 - pid], 1, stor), stor += (STACK_DEPTH + 1);
+			temp->sort();
+			double e = search(1, temp);
+			if (e > max_e)
+				max_e = e, sel = i;
+			stor -= (STACK_DEPTH + 1) * 2;
+		}
+		return sel;
 	}
 };
 
